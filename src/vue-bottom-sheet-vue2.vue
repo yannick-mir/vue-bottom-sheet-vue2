@@ -92,7 +92,9 @@ export default {
       translateValue: this.closeHeightPercent,
       isDragging: false,
       contentScroll: 0,
-      sheetHeight: 0
+      sheetHeight: 0,
+      contentObserver: null,
+      heightUpdateTimeout: null
     }
   },
   methods: {
@@ -227,15 +229,48 @@ export default {
         this.close()
       }
     },
+    setupContentObserver() {
+      // Create a MutationObserver to watch for changes in the main content
+      this.contentObserver = new MutationObserver(() => {
+        // Debounce the initHeight call to avoid excessive recalculations
+        clearTimeout(this.heightUpdateTimeout)
+        this.heightUpdateTimeout = setTimeout(() => {
+          this.initHeight()
+        }, 100)
+      })
+
+      // Start observing the main content area for changes
+      if (this.$refs.bottomSheetMain) {
+        this.contentObserver.observe(this.$refs.bottomSheetMain, {
+          childList: true,
+          subtree: true,
+          attributes: false,
+          characterData: true
+        })
+      }
+    },
   },
   beforeDestroy() {
     window.removeEventListener('keyup', this.keyupHandler)
+    
+    // Clean up the content observer
+    if (this.contentObserver) {
+      this.contentObserver.disconnect()
+    }
+    
+    // Clear any pending timeout
+    if (this.heightUpdateTimeout) {
+      clearTimeout(this.heightUpdateTimeout)
+    }
   },
   async mounted() {
    setTimeout(() =>{
      this.initHeight()
 
      window.addEventListener('keyup', this.keyupHandler)
+
+     // Set up content observer to watch for changes in main content
+     this.setupContentObserver()
 
      /**
       * Create instances of Hammerjs
@@ -265,7 +300,7 @@ export default {
   watch: {
     initSheetHeight(newVal, oldVal){
       this.initHeight()
-    }
+    },
   },
   computed: {
     sheetContentClasses() {
